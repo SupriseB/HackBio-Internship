@@ -13,85 +13,82 @@ glioblastoma_data <- read.csv(url, row.names = 1)
 # View the first few rows of the dataset
 head(glioblastoma_data)
 
-# Normalize the data by counts per million (CPM)
-# sum across each column (sample) and divide by 1 million
-cpm_data <- apply(glioblastoma_data, 2, function(x) (x / sum(x)) * 1e6)
-
-# View the CPM-normalized data
-head(cpm_data)
-
-# Log2-transform the normalized data with a pseudocount of 1 (to avoid issues with zero)
-log2_transformed_data <- log2(cpm_data + 1)
-
-# View the log2-transformed data
-head(log2_transformed_data)
-
-#Let us check the names of each sample
-colnames(log2_transformed_data) #Note that we have 10 Samples
-
-#Each of the samples is labelled 1-10
-log2_transformed_data[, c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)]
-
-#To calculate fold changes, Data needs to have two conditions.
-#split the data into two groups (Treatment and Control)
-treatment_samples <- log2_transformed_data[, c(1, 2, 3, 4, 5)]  # Treatment group
-control_samples <- log2_transformed_data[, c(6, 7, 8, 9, 10)]    # Control group
-
-# Calculate the mean expression for control and treatment groups
-mean_control <- rowMeans(control_samples)
-mean_treatment <- rowMeans(treatment_samples)
-
-# Calculate the fold change (log2 fold change: treatment - control)
-fold_change <- mean_treatment - mean_control
-
-# View the fold changes
-head(fold_change)
-
-# Perform t-tests for each gene between control and treatment
-p_values <- apply(log2_transformed_data, 1, function(x) {
-  t.test(x[1:2], x[3:4])$p.value  # Adjust the indices based on your actual control/treatment samples
-})
-
-# View the p-values
-head(p_values)
-
-# Combine the fold change and p-values into a single data frame to identify differentially expressed gene
-results <- data.frame(Gene = rownames(log2_transformed_data), 
-                      FoldChange = fold_change, 
-                      PValue = p_values)
-
-# View the results
-head(results)
-results
+# Remove non-numeric columns and scale the data
+data_for_clustering <- glioblastoma_data[, sapply(glioblastoma_data, is.numeric)]
+scaled_data <- t(scale(t(data_for_clustering)))  # Mean-center and scale by rows (genes)
+# Heatmap using a diverging color palette (blue-white-red)
+heatmap.2(scaled_data,
+          Rowv = TRUE,
+          Colv = TRUE,
+          dendrogram = "both",
+          #col = bluered(100),  # Diverging color palette
+          col = colorRampPalette(c("blue", "white", "red"))(100),  # Blue to white to red
+          trace = "none",
+          margins = c(10, 10),
+          key = TRUE,
+          keysize = 1.5,
+          density.info = "none",
+          cexCol = 0.7,
+          main = "Heatmap with Diverging Palette")
 
 
-#Filter for upregulated and downregulated genes based on fold change and p-value cutoffs:
+# Heatmap using a sequential color palette (light blue to dark blue)
+x11()
+heatmap.2(scaled_data,
+          Rowv = TRUE,
+          Colv = TRUE,
+          dendrogram = "both",
+          col = colorRampPalette(c("lightblue", "blue", "darkblue"))(100),  # Sequential palette
+          trace = "none",
+          margins = c(10, 10),
+          key = TRUE,
+          keysize = 1.5,
+          density.info = "none",
+          cexCol = 0.7,
+          main = "Heatmap with Sequential Palette")
 
-#Upregulated gene
+# Cluster only rows (genes)
+x11()
+heatmap.2(scaled_data,
+          Rowv = TRUE,         # Cluster rows (genes)
+          Colv = FALSE,        # Do not cluster columns (samples)
+          dendrogram = "row",  # Show dendrogram for rows only
+          col = bluered(100),  # Diverging color palette
+          trace = "none",
+          margins = c(10, 10),
+          key = TRUE,
+          cexCol = 0.7,
+          density.info = "none",
+          main = "Clustered Genes (Rows) Only")
 
-# Set fold change and p-value cutoffs
-fold_change_cutoff <- 1.5  
-p_value_cutoff <- 0.05
 
-# Filter for upregulated genes
-upregulated_genes <- results %>%
-  filter(FoldChange > fold_change_cutoff & PValue < p_value_cutoff)
+# Cluster only columns (samples)
+x11()
+heatmap.2(scaled_data,
+          Rowv = FALSE,        # Do not cluster rows (genes)
+          Colv = TRUE,         # Cluster columns (samples)
+          dendrogram = "column", # Show dendrogram for columns only
+          col = bluered(100),  # Diverging color palette
+          trace = "none",
+          margins = c(10, 10),
+          key = TRUE,
+          cexCol = 0.7,
+          density.info = "none",
+          main = "Clustered Samples (Columns) Only")
 
-# View the upregulated genes
-head(upregulated_genes)
-
-#Downregulated gene
-# Filter for downregulated genes
-downregulated_genes <- results %>%
-  filter(FoldChange < -fold_change_cutoff & PValue < p_value_cutoff)
-
-# View the downregulated genes
-head(downregulated_genes)
-
-# Save the results to CSV files
-write.csv(as.data.frame(upregulated_genes), "upregulated_genes.csv")
-write.csv(as.data.frame(downregulated_genes), "downregulated_genes.csv")
-
+# Cluster both rows (genes) and columns (samples)
+x11()
+heatmap.2(scaled_data,
+          Rowv = TRUE,         # Cluster rows (genes)
+          Colv = TRUE,         # Cluster columns (samples)
+          dendrogram = "both", # Show dendrogram for both rows and columns
+          col = bluered(100),  # Diverging color palette
+          trace = "none",
+          margins = c(10, 10),
+          key = TRUE,
+          cexCol = 0.7,
+          density.info = "none",
+          main = "Clustered Genes and Samples Together")
 
 
 
